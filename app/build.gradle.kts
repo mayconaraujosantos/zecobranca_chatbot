@@ -22,6 +22,14 @@ repositories {
 dependencies {
     // This dependency is used by the application.
     implementation(libs.guava)
+    implementation(libs.javalin)
+    implementation(libs.jackson.module.kotlin)
+    implementation(libs.okhttp)
+    implementation(libs.slf4j.simple)
+
+    testImplementation(libs.kotest.runner.junit5)
+    testImplementation(libs.kotest.assertions.core)
+    testImplementation(kotlin("test"))
 }
 
 testing {
@@ -37,11 +45,11 @@ testing {
 // Apply a specific Java toolchain to ease working on different environments.
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
 
 application {
     // Define the main class for the application.
-    mainClass = "com.AppKt"
+    mainClass = "com.zecobranca.AppKt"
 }

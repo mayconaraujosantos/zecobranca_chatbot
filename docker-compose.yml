@@ -1,0 +1,113 @@
+version: "3.9"
+
+volumes:
+  prometheus: { }
+  grafana_data: { }
+
+services:
+  zecobranca_chatbot:
+    image: ghcr.io/zecobranca/chatbot:latest
+    container_name: zecobranca_chatbot
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://zecobranca:zecobranca@zecobranca_db:5432/zecobranca
+      - REDIS_URL=redis://zecobranca_redis:6379
+      - JWT_SECRET=your_jwt_secret_here
+    ports:
+      - "3000:3000"
+    depends_on:
+      - zecobranca_db
+      - zecobranca_redis
+
+  zecobranca_redis:
+    image: redis:latest
+    container_name: zecobranca_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  zecobranca_prometheus:
+    image: prom/prometheus:latest
+    container_name: zecobranca_prometheus
+    restart: unless-stopped
+    volumes:
+      - prometheus:/etc/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    depends_on:
+      - zecobranca_chatbot
+
+  zecobranca_grafana:
+    image: grafana/grafana:latest
+    container_name: zecobranca_grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - zecobranca_prometheus
+
+  zecobranca_node_red:
+    image: ghcr.io/zecobranca/node-red:latest
+    container_name: zecobranca_node_red
+    restart: unless-stopped
+    environment:
+      - NODE_RED_ENABLE_PROJECTS=true
+      - NODE_RED_USERNAME=admin
+      - NODE_RED_PASSWORD=admin
+    ports:
+      - "1880:1880"
+    volumes:
+      - /var/log:/var/log
+      - /etc/hosts:/etc/hosts
+      - /etc/hostname:/etc/hostname
+    depends_on:
+      - zecobranca_chatbot
+
+  zecobranca_loki:
+    image: ghcr.io/zecobranca/loki:latest
+    container_name: zecobranca_loki
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log
+      - /etc/hosts:/etc/hosts
+      - /etc/hostname:/etc/hostname
+    command: -config.file=/etc/loki/config.yaml
+    ports:
+      - "3100:3100"
+
+  zecobranca_promtail:
+    image: ghcr.io/zecobranca/promtail:latest
+    container_name: zecobranca_promtail
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log
+      - /etc/hosts:/etc/hosts
+      - /etc/hostname:/etc/hostname
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - zecobranca_loki
+
+  zecobranca_db:
+    image: postgres:latest
+    container_name: zecobranca_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=zecobranca
+      - POSTGRES_PASSWORD=zecobranca
+      - POSTGRES_DB=zecobranca
+    volumes:
+      - zecobranca_db_data:/var/lib/postgresql/data
+    ports:
+      - 5532:5432
