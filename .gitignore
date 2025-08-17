@@ -3,3 +3,52 @@
 
 # Ignore Gradle build output directory
 build
+
+### Kotlin / Java
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+*.log
+
+### Gradle
+.gradle/
+build/
+out/
+
+# Se usar Gradle local wrapper
+.gradle-cache/
+!gradle-wrapper.jar
+
+### IntelliJ IDEA / JetBrains
+.idea/
+*.ipr
+*.iws
+*.iml
+
+### Eclipse
+.project
+.classpath
+.settings/
+bin/
+
+### VS Code
+.vscode/
+
+### OS
+.DS_Store
+Thumbs.db
+
+### Test reports
+/test-results/
+/reports/
+
+### Logs & temp
+*.log
+*.tmp
+*.swp
+*.swo
+
+.kotlin/
+.trunk/
