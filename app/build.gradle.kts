@@ -54,7 +54,24 @@ java {
 
 application {
     // Define the main class for the application.
-    mainClass = "com.zecobranca.AppKt"
+    mainClass = "com.zecobranca.MainKt"
+}
+
+tasks.jar {
+    manifest {
+        attributes(
+            "Main-Class" to "com.zecobranca.MainKt",
+            "Implementation-Title" to "ZeCobranca",
+            "Implementation-Version" to project.version
+        )
+    }
+
+    // Include all dependencies in the jar
+    from(configurations.runtimeClasspath.get().map {
+        if (it.isDirectory) it else zipTree(it)
+    })
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") {
