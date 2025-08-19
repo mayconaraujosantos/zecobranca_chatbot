@@ -44,6 +44,8 @@ Thumbs.db
 /test-results/
 /reports/
 
+tmp/
+
 ### Logs & temp
 *.log
 *.tmp
