@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Copiar arquivos do Gradle
 COPY build.gradle.kts settings.gradle.kts gradle.properties* ./
+COPY app/build.gradle.kts .
 COPY gradle/libs.versions.toml gradle/
 COPY gradle/wrapper/ gradle/wrapper/
 
@@ -12,7 +13,7 @@ COPY gradle/wrapper/ gradle/wrapper/
 RUN gradle build -x test --no-daemon || return 0
 
 # Copiar código fonte
-COPY src/ src/
+COPY app/ app/
 
 # Compilar aplicação
 RUN gradle clean build -x test --no-daemon
