@@ -5,8 +5,8 @@ WORKDIR /app
 
 # Copiar arquivos do Gradle
 COPY build.gradle.kts settings.gradle.kts gradle.properties* ./
-COPY gradle/ gradle/
-COPY libs.versions.toml ./
+COPY gradle/libs.versions.toml gradle/
+COPY gradle/wrapper/ gradle/wrapper/
 
 # Baixar dependências
 RUN gradle build -x test --no-daemon || return 0
@@ -18,7 +18,7 @@ COPY src/ src/
 RUN gradle clean build -x test --no-daemon
 
 # Etapa final - Runtime
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:17-jre-alpine
 
 # Criar usuário não-root
 RUN addgroup -g 1001 -S appgroup && \
