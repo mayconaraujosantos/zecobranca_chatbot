@@ -10,3 +10,7 @@
 # Binary files should be left untouched
 *.jar           binary
 
+
+* text=auto eol=lf
+*.{cmd,[cC][mM][dD]} text eol=crlf
+*.{bat,[bB][aA][tT]} text eol=crlf
