@@ -12,6 +12,7 @@ plugins {
 
     // Apply the application plugin to add support for building a CLI application in Java.
     application
+    jacoco
 }
 
 repositories {
@@ -54,4 +55,51 @@ java {
 application {
     // Define the main class for the application.
     mainClass = "com.zecobranca.AppKt"
+}
+
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") {
+    kotlinOptions {
+        // Enable experimental coroutines support
+        freeCompilerArgs = listOf("-Xopt-in=kotlinx.coroutines.ExperimentalCoroutinesApi")
+    }
+}
+
+tasks.test {
+    useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    // Exclude specific files from coverage report
+    classDirectories.setFrom(
+        files(classDirectories.files.map {
+            fileTree(it) {
+                // Add files to exclude here
+                exclude(
+                    // Exclude main application file
+                    "**/Main.class",
+                    // Exclude data classes
+                    "**/models/**",
+                    // Exclude specific file
+                    "**/com/zecobranca/main/WebhookIntegrationTest.class"
+                )
+            }
+        })
+    )
+    dependsOn(tasks.test) // Ensure tests are run before generating the report
+}
+
+// Optional: Add coverage verification
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = "0.70".toBigDecimal()
+            }
+        }
+    }
 }
