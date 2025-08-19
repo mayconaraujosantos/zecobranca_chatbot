@@ -1,52 +1,39 @@
-# Multi-stage build para otimizar tamanho da imagem
+# Etapa de build
 FROM gradle:8.12.0-jdk21-alpine AS builder
 
-# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de configuração do Gradle primeiro (para cache)
+# Copiar arquivos do Gradle
 COPY build.gradle.kts settings.gradle.kts gradle.properties* ./
-COPY libs.versions.toml ./
 COPY gradle/ gradle/
+COPY libs.versions.toml ./
 
-# Baixar dependências (será cacheado se os arquivos acima não mudarem)
-RUN gradle dependencies --no-daemon
+# Baixar dependências
+RUN gradle build -x test --no-daemon || return 0
 
 # Copiar código fonte
 COPY src/ src/
 
 # Compilar aplicação
-RUN gradle build -x test --no-daemon
+RUN gradle clean build -x test --no-daemon
 
-# Estágio final - Runtime
-FROM amazoncorretto:17-alpine
+# Etapa final - Runtime
+FROM eclipse-temurin:21-jre-alpine
 
-# Instalar dumb-init para melhor handling de sinais
-RUN apk add --no-cache dumb-init
-
-# Criar usuário não-root para segurança
+# Criar usuário não-root
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
-# Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar JAR da fase de build
+# Copiar jar do builder
 COPY --from=builder /app/build/libs/*.jar app.jar
 
-# Alterar ownership para usuário não-root
-RUN chown -R appuser:appgroup /app
-
-# Mudar para usuário não-root
 USER appuser
 
-# Definir variáveis de ambiente
-ENV JAVA_OPTS="-Xmx512m -Xms256m" \
-    SERVER_PORT=8080
+# Railway define $PORT automaticamente
+ENV JAVA_OPTS="-Xmx512m -Xms256m"
 
-# Expor porta (Railway usa a variável PORT)
 EXPOSE 8080
 
-# Comando de entrada com dumb-init
-ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT:-8080} -jar app.jar"]
+CMD ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT} -jar app.jar"]
