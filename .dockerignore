@@ -1,66 +1,43 @@
-# Build outputs
-build/
-target/
-*.jar
-*.war
+# Version control
+.git
+.gitignore
+.gitattributes
 
-# Gradle
+# Gradle files
 .gradle/
-gradle-wrapper.jar
+build/
+!gradle/wrapper/gradle-wrapper.jar
 
-# IDEs
+# IDE files
 .idea/
 .vscode/
 *.iml
 *.ipr
 *.iws
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
+# Logs and databases
 *.log
-logs/
-
-# Temporary files
-*.tmp
-*.temp
-*~
-
-# Documentation
-*.md
-docs/
-
-# Git
-.git/
-.gitignore
-
-# Docker
-Dockerfile*
-docker-compose*
-.dockerignore
-
-# CI/CD
-.github/
-.gitlab-ci.yml
-Jenkinsfile
+*.sqlite
 
 # Environment files
 .env*
-!.env.example
+*.env
 
-# Test files
-src/test/
-**/test/
-**/*test*
+# OS generated files
+.DS_Store
+Thumbs.db
 
-# Coverage reports
-coverage/
-*.coverage
+# Test reports and coverage
+/test-results/
+/reports/
+/coverage/
 
-# Node modules (se houver frontend)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+
+# Development tools
+.editorconfig
+.prettierrc
+.eslintrc
