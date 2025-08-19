@@ -26,7 +26,9 @@ dependencies {
     implementation(libs.jackson.module.kotlin)
     implementation(libs.okhttp)
     implementation(libs.slf4j.simple)
+    implementation(libs.kotlinx.coroutines.core)
 
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)
     testImplementation(kotlin("test"))
