@@ -19,14 +19,12 @@ object JavalinRouteAdapter {
           body = ctx.body(),
           headers = ctx.headerMap(),
           params = ctx.pathParamMap(),
-          query = ctx.queryParamMap().mapValues { it.value.firstOrNull() ?: "" }
+          query = ctx.queryParamMap().mapValues { it.value.firstOrNull() ?: "" },
         )
 
         val httpResponse = controller.handle(httpRequest)
         ctx.status(httpResponse.statusCode)
-        httpResponse.headers.forEach { (key, value) ->
-          ctx.header(key, value)
-        }
+        httpResponse.headers.forEach { (key, value) -> ctx.header(key, value) }
 
         when (httpResponse.body) {
           is String -> ctx.result(httpResponse.body)
@@ -39,7 +37,6 @@ object JavalinRouteAdapter {
             }
           }
         }
-
       } catch (e: Exception) {
         logger.error("Error processing request", e)
         ctx.status(500).json(mapOf("error" to "Internal server error"))

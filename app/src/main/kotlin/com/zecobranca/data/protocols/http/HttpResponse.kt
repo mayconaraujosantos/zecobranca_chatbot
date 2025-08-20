@@ -1,4 +1,4 @@
-package com.zecobranca.presentation.protocols
+package com.zecobranca.data.protocols.http
 
 data class HttpResponse(
   val statusCode: Int,
