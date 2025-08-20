@@ -15,14 +15,7 @@ object Application {
             Javalin.create { config ->
               config.showJavalinBanner = false
               config.http.defaultContentType = "application/json"
-
-              // Configuração para aceitar conexões externas (necessário para Railway)
-              config.server {
-                it.host = "0.0.0.0" // Aceita conexões de qualquer IP
-                it.port = Env.port
-              }
-
-              logger.info("⚙️ Javalin configuration applied - Host: 0.0.0.0, Port: ${Env.port}")
+              logger.info("⚙️ Javalin configuration applied")
             }
 
     logger.info("🔧 Setting up WebHook routes")
