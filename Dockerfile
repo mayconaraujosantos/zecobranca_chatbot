@@ -23,6 +23,9 @@ RUN ./gradlew clean build --no-daemon
 # Etapa final - Runtime
 FROM eclipse-temurin:17-jre-alpine
 
+# Instalar curl para healthcheck mais confiável
+RUN apk add --no-cache curl
+
 # Criar usuário não-root com Alpine tools
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
@@ -35,11 +38,15 @@ RUN chown appuser:appgroup app.jar
 
 USER appuser
 
+# Configurar variáveis de ambiente padrão (serão sobrescritas pelo Railway)
+ENV PORT=8080
 ENV JAVA_OPTS="-Xmx512m -Xms256m"
+
 EXPOSE 8080
 
-# Adicionar healthcheck usando a rota de health implementada
-HEALTHCHECK --interval=30s --timeout=3s \
-    CMD wget -q --spider http://localhost:${PORT}/health || exit 1
+# Healthcheck usando curl com 0.0.0.0 (mais confiável para Railway)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://0.0.0.0:${PORT}/health || exit 1
 
+# Comando de inicialização que usa a variável PORT do Railway
 CMD ["sh", "-c", "java $JAVA_OPTS -Dserver.port=${PORT} -jar app.jar"]
