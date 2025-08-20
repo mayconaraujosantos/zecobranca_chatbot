@@ -1,0 +1,21 @@
+server:
+  port: ${PORT:8080}
+  host: ${HOST:0.0.0.0}
+
+logging:
+  level:
+    com.zecobranca: DEBUG
+    io.javalin: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+app:
+  chatpro:
+    api-token: ${CHATPRO_API_TOKEN}
+    instance-id: ${CHATPRO_INSTANCE_ID}
+    api-url: ${CHATPRO_API_URL:https://v5.chatpro.com.br/}
+
+# Configurações específicas do Railway
+railway:
+  environment: ${RAILWAY_ENVIRONMENT:local}
+  public-domain: ${RAILWAY_PUBLIC_DOMAIN:}
