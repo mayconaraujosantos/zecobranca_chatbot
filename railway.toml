@@ -1,0 +1,15 @@
+[build]
+builder = "dockerfile"
+
+[deploy]
+startCommand = "java -jar app.jar"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[deploy.envs]
+JAVA_VERSION = "17"
+PORT = "8080"
+RAILWAY_ENVIRONMENT = "production"
+

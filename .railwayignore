@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+gradle/
+gradlew
+gradlew.bat
+
+# IDE
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker/
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+.tmp/
+
+# Test files
+**/test/
+**/tests/
+
+# Documentation
+README.md
+*.md
+
+# CI/CD
+.github/
