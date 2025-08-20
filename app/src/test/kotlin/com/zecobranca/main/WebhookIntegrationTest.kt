@@ -12,7 +12,6 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
-
 class WebhookIntegrationTest {
   private lateinit var app: Javalin
   private val client = HttpClient.newHttpClient()
@@ -34,11 +33,7 @@ class WebhookIntegrationTest {
   @Test
   fun `should return 200 for health check`() = runTest {
     val request =
-      HttpRequest
-        .newBuilder()
-        .uri(URI.create("http://localhost:$port/health"))
-        .GET()
-        .build()
+      HttpRequest.newBuilder().uri(URI.create("http://localhost:$port/health")).GET().build()
 
     val response = client.send(request, HttpResponse.BodyHandlers.ofString())
 

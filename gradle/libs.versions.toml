@@ -9,7 +9,7 @@ jackson = "2.15.1"
 okhttp = "4.11.0"
 slf4j = "2.0.9"
 kotlinx-coroutines = "1.7.3"
-mockk = "1.13.12"
+mockk = "1.14.5"
 
 [libraries]
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
