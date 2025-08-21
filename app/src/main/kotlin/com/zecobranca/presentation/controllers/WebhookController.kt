@@ -154,44 +154,62 @@ class WebhookController(
               }
 
       logger.info(
-              "✅ Webhook parsed successfully - From: ${webhookMessage.from}, Body: ${webhookMessage.body}, Type: ${webhookMessage.type}"
+              "✅ Webhook parsed successfully - From: ${webhookMessage.getActualFrom()}, Body: ${webhookMessage.getActualBody()}, Type: ${webhookMessage.type}"
       )
 
       // Verificar se é um webhook de status de cobrança (não precisa de processamento)
       if (webhookMessage.type == "charge_status") {
-        logger.info("💰 Received charge status webhook - Status: ${webhookMessage.status}")
+        logger.info(
+                "💰 Received charge status webhook - Status: ${webhookMessage.getActualStatus()}"
+        )
         return HttpHelper.ok(
-                mapOf("message" to "Charge status received", "status" to webhookMessage.status)
+                mapOf(
+                        "message" to "Charge status received",
+                        "status" to webhookMessage.getActualStatus()
+                )
         )
       }
 
       // Verificar se é um webhook de status de mensagem (não precisa de processamento)
       if (webhookMessage.type == "message_status") {
-        logger.info("📨 Received message status webhook - Status: ${webhookMessage.status}")
+        logger.info(
+                "📨 Received message status webhook - Status: ${webhookMessage.getActualStatus()}"
+        )
         return HttpHelper.ok(
-                mapOf("message" to "Message status received", "status" to webhookMessage.status)
+                mapOf(
+                        "message" to "Message status received",
+                        "status" to webhookMessage.getActualStatus()
+                )
         )
       }
 
       // Verificar se é um webhook de status de conexão (não precisa de processamento)
       if (webhookMessage.type == "connection_status") {
-        logger.info("🔌 Received connection status webhook - Status: ${webhookMessage.status}")
+        logger.info(
+                "🔌 Received connection status webhook - Status: ${webhookMessage.getActualStatus()}"
+        )
         return HttpHelper.ok(
-                mapOf("message" to "Connection status received", "status" to webhookMessage.status)
+                mapOf(
+                        "message" to "Connection status received",
+                        "status" to webhookMessage.getActualStatus()
+                )
         )
       }
 
       // Verificar se é um webhook de grupo (não precisa de processamento por enquanto)
       if (webhookMessage.type == "group_message") {
-        logger.info("👥 Received group message webhook - From: ${webhookMessage.from}")
+        logger.info("👥 Received group message webhook - From: ${webhookMessage.getActualFrom()}")
         return HttpHelper.ok(
-                mapOf("message" to "Group message received", "from" to webhookMessage.from)
+                mapOf(
+                        "message" to "Group message received",
+                        "from" to webhookMessage.getActualFrom()
+                )
         )
       }
 
       // Verificar se é um webhook de mensagem válida (recebida ou enviada pelo usuário)
       // Ignorar webhooks de confirmação de envio para evitar loops
-      if (webhookMessage.from == null) {
+      if (webhookMessage.getActualFrom() == null) {
         logger.info("ℹ️ Received webhook without sender - Type: ${webhookMessage.type}")
         return HttpHelper.ok(mapOf("message" to "Webhook received", "type" to webhookMessage.type))
       }
@@ -209,7 +227,7 @@ class WebhookController(
       }
 
       // Verificar se é uma confirmação de envio (FromMe: true) - ignorar para evitar loop
-      if (webhookMessage.type == "send_message" && webhookMessage.fromMe == true) {
+      if (webhookMessage.type == "send_message" && webhookMessage.getActualFromMe() == true) {
         logger.info("ℹ️ Ignoring message confirmation webhook to prevent loop - FromMe: true")
         return HttpHelper.ok(
                 mapOf("message" to "Message confirmation ignored", "type" to webhookMessage.type)
@@ -217,19 +235,19 @@ class WebhookController(
       }
 
       // Verificar se é uma mensagem de grupo - processar como mensagem normal
-      val isGroupMessage = webhookMessage.from?.contains("@g.us") == true
+      val isGroupMessage = webhookMessage.getActualFrom()?.contains("@g.us") == true
       if (isGroupMessage) {
-        logger.info("👥 Processing group message from: ${webhookMessage.from}")
+        logger.info("👥 Processing group message from: ${webhookMessage.getActualFrom()}")
       }
 
       // Convert to map for validation
       val messageMap =
               mapOf(
-                      "id" to webhookMessage.id,
-                      "from" to webhookMessage.from,
-                      "body" to webhookMessage.body,
+                      "id" to webhookMessage.getActualId(),
+                      "from" to webhookMessage.getActualFrom(),
+                      "body" to webhookMessage.getActualBody(),
                       "type" to webhookMessage.type,
-                      "timestamp" to webhookMessage.timestamp,
+                      "timestamp" to webhookMessage.getActualTimestamp(),
                       "instanceId" to webhookMessage.instanceId,
               )
       logger.debug("🔍 Validation map created: $messageMap")
@@ -243,18 +261,33 @@ class WebhookController(
       logger.info("✅ Validation passed")
 
       logger.info(
-              "🚀 Processing ${webhookMessage.type} webhook message for user: ${webhookMessage.from}"
+              "🚀 Processing ${webhookMessage.type} webhook message for user: ${webhookMessage.getActualFrom()}"
       )
-      val result = processWebhookMessage.process(webhookMessage)
+
+      // Criar um WebhookMessage limpo para o processamento
+      val cleanWebhookMessage =
+              WebhookMessage(
+                      id = webhookMessage.getActualId(),
+                      from = webhookMessage.getActualFrom(),
+                      body = webhookMessage.getActualBody(),
+                      type = webhookMessage.type,
+                      timestamp = webhookMessage.getActualTimestamp(),
+                      instanceId = webhookMessage.instanceId,
+                      status = webhookMessage.getActualStatus(),
+                      chargeStatus = webhookMessage.chargeStatus,
+                      fromMe = webhookMessage.getActualFromMe()
+              )
+
+      val result = processWebhookMessage.process(cleanWebhookMessage)
 
       if (result.success) {
         logger.info(
-                "🎉 ${webhookMessage.type} webhook processed successfully for user: ${webhookMessage.from}"
+                "🎉 ${webhookMessage.type} webhook processed successfully for user: ${webhookMessage.getActualFrom()}"
         )
         HttpHelper.ok(mapOf("message" to "Processed successfully", "type" to webhookMessage.type))
       } else {
         logger.error(
-                "💥 ${webhookMessage.type} webhook processing failed for user: ${webhookMessage.from}, error: ${result.error}"
+                "💥 ${webhookMessage.type} webhook processing failed for user: ${webhookMessage.getActualFrom()}, error: ${result.error}"
         )
         HttpHelper.badRequest(result.error ?: "Processing failed")
       }
