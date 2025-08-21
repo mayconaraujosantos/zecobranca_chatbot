@@ -12,4 +12,6 @@ data class WebhookMessage(
         val instanceId: String?, // id da instância
         val status: Int? = null, // status do ChatPro (ex: 400, 200)
         val chargeStatus: String? = null, // status da cobrança
+        val fromMe: Boolean? =
+                null, // indica se a mensagem foi enviada por nós (true) ou pelo usuário (false)
 )

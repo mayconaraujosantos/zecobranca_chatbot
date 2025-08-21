@@ -30,6 +30,7 @@ class WebhookController(
       val timestampMatch = """"Timestamp":\s*(\d+)""".toRegex().find(jsonBody)
       val textMatch = """"Text":\s*"([^"]*)"""".toRegex().find(jsonBody)
       val pushNameMatch = """"PushName":\s*"([^"]*)"""".toRegex().find(jsonBody)
+      val fromMeMatch = """"FromMe":\s*(true|false)""".toRegex().find(jsonBody)
 
       val type = typeMatch?.groupValues?.get(1) ?: "unknown"
       val id = idMatch?.groupValues?.get(1)
@@ -39,6 +40,7 @@ class WebhookController(
       val body = textMatch?.groupValues?.get(1)
       val timestamp = timestampMatch?.groupValues?.get(1)?.toLong()
       val pushName = pushNameMatch?.groupValues?.get(1)
+      val fromMe = fromMeMatch?.groupValues?.get(1)?.toBoolean()
 
       logger.debug(
               "🔍 Extracted fields - Type: $type, From: $from, Body: $body, Timestamp: $timestamp"
@@ -52,7 +54,8 @@ class WebhookController(
               timestamp = timestamp,
               instanceId = null,
               status = null,
-              chargeStatus = null
+              chargeStatus = null,
+              fromMe = fromMe
       )
     } catch (e: Exception) {
       logger.error("💥 Failed to create basic webhook message: ${e.message}")
@@ -103,11 +106,26 @@ class WebhookController(
       }
 
       // Verificar se é um webhook de mensagem válida (recebida ou enviada pelo usuário)
-      if ((webhookMessage.type != "received" && webhookMessage.type != "send_message") ||
-                      webhookMessage.from == null
-      ) {
-        logger.info("ℹ️ Received non-message webhook - Type: ${webhookMessage.type}")
+      // Ignorar webhooks de confirmação de envio para evitar loops
+      if (webhookMessage.from == null) {
+        logger.info("ℹ️ Received webhook without sender - Type: ${webhookMessage.type}")
         return HttpHelper.ok(mapOf("message" to "Webhook received", "type" to webhookMessage.type))
+      }
+
+      // Processar apenas mensagens do usuário, não confirmações do sistema
+      if (webhookMessage.type != "received" && webhookMessage.type != "send_message") {
+        logger.info("ℹ️ Received system webhook - Type: ${webhookMessage.type}")
+        return HttpHelper.ok(
+                mapOf("message" to "System webhook received", "type" to webhookMessage.type)
+        )
+      }
+
+      // Verificar se é uma confirmação de envio (FromMe: true) - ignorar para evitar loop
+      if (webhookMessage.type == "send_message" && webhookMessage.fromMe == true) {
+        logger.info("ℹ️ Ignoring message confirmation webhook to prevent loop - FromMe: true")
+        return HttpHelper.ok(
+                mapOf("message" to "Message confirmation ignored", "type" to webhookMessage.type)
+        )
       }
 
       // Convert to map for validation
