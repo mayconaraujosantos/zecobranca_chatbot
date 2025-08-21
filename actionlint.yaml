@@ -1,4 +1,0 @@
-# Configuração do Actionlint para reconhecer labels customizados
-runner:
-  labels:
-    - railway
