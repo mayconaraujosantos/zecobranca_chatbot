@@ -154,8 +154,23 @@ class WebhookController(
               }
 
       logger.info(
-              "✅ Webhook parsed successfully - From: ${webhookMessage.getActualFrom()}, Body: ${webhookMessage.getActualBody()}, Type: ${webhookMessage.type}"
+              "✅ Webhook parsed successfully - From: ${webhookMessage.getActualFrom()}, Body: ${webhookMessage.getActualBody()}, Type: ${webhookMessage.getActualType()}"
       )
+
+      // Verificar se é um evento de ACK (acknowledgment) - não precisa de processamento para
+      // conversa
+      if (webhookMessage.isAckEvent()) {
+        logger.info(
+                "📨 Received ACK webhook - Status: ${webhookMessage.getActualStatus()} (${webhookMessage.getAckDescription()})"
+        )
+        return HttpHelper.ok(
+                mapOf(
+                        "message" to "ACK received",
+                        "ack" to webhookMessage.getActualStatus(),
+                        "description" to webhookMessage.getAckDescription()
+                )
+        )
+      }
 
       // Verificar se é um webhook de status de cobrança (não precisa de processamento)
       if (webhookMessage.type == "charge_status") {
@@ -216,14 +231,10 @@ class WebhookController(
 
       // Processar mensagens recebidas (incluindo "receveid_message" com erro de digitação)
       // e mensagens enviadas, mas não confirmações do sistema
-      if (webhookMessage.type != "receveid_message" &&
-                      webhookMessage.type != "received" &&
-                      webhookMessage.type != "send_message"
-      ) {
-        logger.info("ℹ️ Received system webhook - Type: ${webhookMessage.type}")
-        return HttpHelper.ok(
-                mapOf("message" to "System webhook received", "type" to webhookMessage.type)
-        )
+      val actualType = webhookMessage.getActualType()
+      if (actualType != "received" && actualType != "send_message") {
+        logger.info("ℹ️ Received system webhook - Type: $actualType")
+        return HttpHelper.ok(mapOf("message" to "System webhook received", "type" to actualType))
       }
 
       // Verificar se é uma confirmação de envio (FromMe: true) - ignorar para evitar loop
