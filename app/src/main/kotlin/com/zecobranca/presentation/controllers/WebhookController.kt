@@ -32,6 +32,12 @@ class WebhookController(
       val pushNameMatch = """"PushName":\s*"([^"]*)"""".toRegex().find(jsonBody)
       val fromMeMatch = """"FromMe":\s*(true|false)""".toRegex().find(jsonBody)
 
+      // Novos campos para diferentes tipos de eventos
+      val instanceIdMatch = """"InstanceId":\s*"([^"]*)"""".toRegex().find(jsonBody)
+      val statusMatch = """"Status":\s*(\d+)""".toRegex().find(jsonBody)
+      val statusTextMatch = """"StatusText":\s*"([^"]*)"""".toRegex().find(jsonBody)
+      val chargeStatusMatch = """"ChargeStatus":\s*"([^"]*)"""".toRegex().find(jsonBody)
+
       val type = typeMatch?.groupValues?.get(1) ?: "unknown"
       val id = idMatch?.groupValues?.get(1)
       val from =
@@ -41,9 +47,13 @@ class WebhookController(
       val timestamp = timestampMatch?.groupValues?.get(1)?.toLong()
       val pushName = pushNameMatch?.groupValues?.get(1)
       val fromMe = fromMeMatch?.groupValues?.get(1)?.toBoolean()
+      val instanceId = instanceIdMatch?.groupValues?.get(1)
+      val status = statusMatch?.groupValues?.get(1)?.toInt()
+      val statusText = statusTextMatch?.groupValues?.get(1)
+      val chargeStatus = chargeStatusMatch?.groupValues?.get(1)
 
       logger.debug(
-              "🔍 Extracted fields - Type: $type, From: $from, Body: $body, Timestamp: $timestamp"
+              "🔍 Extracted fields - Type: $type, From: $from, Body: $body, Timestamp: $timestamp, InstanceId: $instanceId, Status: $status"
       )
 
       return WebhookMessage(
@@ -52,9 +62,9 @@ class WebhookController(
               body = body,
               type = type.lowercase(),
               timestamp = timestamp,
-              instanceId = null,
-              status = null,
-              chargeStatus = null,
+              instanceId = instanceId,
+              status = status,
+              chargeStatus = chargeStatus,
               fromMe = fromMe
       )
     } catch (e: Exception) {
@@ -102,6 +112,30 @@ class WebhookController(
         logger.info("💰 Received charge status webhook - Status: ${webhookMessage.status}")
         return HttpHelper.ok(
                 mapOf("message" to "Charge status received", "status" to webhookMessage.status)
+        )
+      }
+
+      // Verificar se é um webhook de status de mensagem (não precisa de processamento)
+      if (webhookMessage.type == "message_status") {
+        logger.info("📨 Received message status webhook - Status: ${webhookMessage.status}")
+        return HttpHelper.ok(
+                mapOf("message" to "Message status received", "status" to webhookMessage.status)
+        )
+      }
+
+      // Verificar se é um webhook de status de conexão (não precisa de processamento)
+      if (webhookMessage.type == "connection_status") {
+        logger.info("🔌 Received connection status webhook - Status: ${webhookMessage.status}")
+        return HttpHelper.ok(
+                mapOf("message" to "Connection status received", "status" to webhookMessage.status)
+        )
+      }
+
+      // Verificar se é um webhook de grupo (não precisa de processamento por enquanto)
+      if (webhookMessage.type == "group_message") {
+        logger.info("👥 Received group message webhook - From: ${webhookMessage.from}")
+        return HttpHelper.ok(
+                mapOf("message" to "Group message received", "from" to webhookMessage.from)
         )
       }
 
