@@ -38,17 +38,67 @@ class WebhookController(
       val statusTextMatch = """"StatusText":\s*"([^"]*)"""".toRegex().find(jsonBody)
       val chargeStatusMatch = """"ChargeStatus":\s*"([^"]*)"""".toRegex().find(jsonBody)
 
+      // Extrair campos da estrutura aninhada Body.Info
+      val bodyInfoIdMatch =
+              """"Body":\s*\{[^}]*"Info":\s*\{[^}]*"Id":\s*"([^"]*)"""".toRegex().find(jsonBody)
+      val bodyInfoRemoteJidMatch =
+              """"Body":\s*\{[^}]*"Info":\s*\{[^}]*"RemoteJid":\s*"([^"]*)""""
+                      .toRegex()
+                      .find(jsonBody)
+      val bodyInfoSenderJidMatch =
+              """"Body":\s*\{[^}]*"Info":\s*\{[^}]*"SenderJid":\s*"([^"]*)""""
+                      .toRegex()
+                      .find(jsonBody)
+      val bodyInfoTimestampMatch =
+              """"Body":\s*\{[^}]*"Info":\s*\{[^}]*"Timestamp":\s*(\d+)""".toRegex().find(jsonBody)
+      val bodyInfoFromMeMatch =
+              """"Body":\s*\{[^}]*"Info":\s*\{[^}]*"FromMe":\s*(true|false)"""
+                      .toRegex()
+                      .find(jsonBody)
+      val bodyInfoPushNameMatch =
+              """"Body":\s*\{[^}]*"Info":\s*\{[^}]*"PushName":\s*"([^"]*)""""
+                      .toRegex()
+                      .find(jsonBody)
+      val bodyInfoStatusMatch =
+              """"Body":\s*\{[^}]*"Info":\s*\{[^}]*"Status":\s*(\d+)""".toRegex().find(jsonBody)
+
+      // Usar campos da estrutura aninhada se disponíveis, senão usar campos diretos
       val type = typeMatch?.groupValues?.get(1) ?: "unknown"
-      val id = idMatch?.groupValues?.get(1)
+      val id = bodyInfoIdMatch?.groupValues?.get(1) ?: idMatch?.groupValues?.get(1)
       val from =
-              remoteJidMatch?.groupValues?.get(1)?.replace("@s.whatsapp.net", "")
-                      ?: senderJidMatch?.groupValues?.get(1)?.replace("@s.whatsapp.net", "")
+              bodyInfoRemoteJidMatch
+                      ?.groupValues
+                      ?.get(1)
+                      ?.replace("@s.whatsapp.net", "")
+                      ?.replace("@g.us", "")
+                      ?: bodyInfoSenderJidMatch
+                              ?.groupValues
+                              ?.get(1)
+                              ?.replace("@s.whatsapp.net", "")
+                              ?.replace("@g.us", "")
+                              ?: remoteJidMatch
+                              ?.groupValues
+                              ?.get(1)
+                              ?.replace("@s.whatsapp.net", "")
+                              ?.replace("@g.us", "")
+                              ?: senderJidMatch
+                              ?.groupValues
+                              ?.get(1)
+                              ?.replace("@s.whatsapp.net", "")
+                              ?.replace("@g.us", "")
       val body = textMatch?.groupValues?.get(1)
-      val timestamp = timestampMatch?.groupValues?.get(1)?.toLong()
-      val pushName = pushNameMatch?.groupValues?.get(1)
-      val fromMe = fromMeMatch?.groupValues?.get(1)?.toBoolean()
+      val timestamp =
+              bodyInfoTimestampMatch?.groupValues?.get(1)?.toLong()
+                      ?: timestampMatch?.groupValues?.get(1)?.toLong()
+      val pushName =
+              bodyInfoPushNameMatch?.groupValues?.get(1) ?: pushNameMatch?.groupValues?.get(1)
+      val fromMe =
+              bodyInfoFromMeMatch?.groupValues?.get(1)?.toBoolean()
+                      ?: fromMeMatch?.groupValues?.get(1)?.toBoolean()
       val instanceId = instanceIdMatch?.groupValues?.get(1)
-      val status = statusMatch?.groupValues?.get(1)?.toInt()
+      val status =
+              bodyInfoStatusMatch?.groupValues?.get(1)?.toInt()
+                      ?: statusMatch?.groupValues?.get(1)?.toInt()
       val statusText = statusTextMatch?.groupValues?.get(1)
       val chargeStatus = chargeStatusMatch?.groupValues?.get(1)
 
@@ -146,8 +196,12 @@ class WebhookController(
         return HttpHelper.ok(mapOf("message" to "Webhook received", "type" to webhookMessage.type))
       }
 
-      // Processar apenas mensagens do usuário, não confirmações do sistema
-      if (webhookMessage.type != "received" && webhookMessage.type != "send_message") {
+      // Processar mensagens recebidas (incluindo "receveid_message" com erro de digitação)
+      // e mensagens enviadas, mas não confirmações do sistema
+      if (webhookMessage.type != "receveid_message" &&
+                      webhookMessage.type != "received" &&
+                      webhookMessage.type != "send_message"
+      ) {
         logger.info("ℹ️ Received system webhook - Type: ${webhookMessage.type}")
         return HttpHelper.ok(
                 mapOf("message" to "System webhook received", "type" to webhookMessage.type)
@@ -160,6 +214,12 @@ class WebhookController(
         return HttpHelper.ok(
                 mapOf("message" to "Message confirmation ignored", "type" to webhookMessage.type)
         )
+      }
+
+      // Verificar se é uma mensagem de grupo - processar como mensagem normal
+      val isGroupMessage = webhookMessage.from?.contains("@g.us") == true
+      if (isGroupMessage) {
+        logger.info("👥 Processing group message from: ${webhookMessage.from}")
       }
 
       // Convert to map for validation
