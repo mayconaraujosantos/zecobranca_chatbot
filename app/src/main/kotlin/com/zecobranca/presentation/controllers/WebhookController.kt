@@ -26,8 +26,22 @@ class WebhookController(
       logger.debug("📝 Parsing webhook message from JSON")
       val webhookMessage = mapper.readValue<WebhookMessage>(request.body)
       logger.info(
-              "✅ Webhook parsed successfully - From: ${webhookMessage.from}, Body: ${webhookMessage.body}"
+              "✅ Webhook parsed successfully - From: ${webhookMessage.from}, Body: ${webhookMessage.body}, Type: ${webhookMessage.type}"
       )
+
+      // Verificar se é um webhook de status de cobrança (não precisa de processamento)
+      if (webhookMessage.type == "charge_status") {
+        logger.info("💰 Received charge status webhook - Status: ${webhookMessage.status}")
+        return HttpHelper.ok(
+                mapOf("message" to "Charge status received", "status" to webhookMessage.status)
+        )
+      }
+
+      // Verificar se é um webhook de mensagem recebida
+      if (webhookMessage.type != "received" || webhookMessage.from == null) {
+        logger.info("ℹ️ Received non-message webhook - Type: ${webhookMessage.type}")
+        return HttpHelper.ok(mapOf("message" to "Webhook received", "type" to webhookMessage.type))
+      }
 
       // Convert to map for validation
       val messageMap =
