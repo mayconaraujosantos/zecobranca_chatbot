@@ -102,8 +102,10 @@ class WebhookController(
         )
       }
 
-      // Verificar se é um webhook de mensagem recebida
-      if (webhookMessage.type != "received" || webhookMessage.from == null) {
+      // Verificar se é um webhook de mensagem válida (recebida ou enviada pelo usuário)
+      if ((webhookMessage.type != "received" && webhookMessage.type != "send_message") ||
+                      webhookMessage.from == null
+      ) {
         logger.info("ℹ️ Received non-message webhook - Type: ${webhookMessage.type}")
         return HttpHelper.ok(mapOf("message" to "Webhook received", "type" to webhookMessage.type))
       }
@@ -128,15 +130,19 @@ class WebhookController(
       }
       logger.info("✅ Validation passed")
 
-      logger.info("🚀 Processing webhook message for user: ${webhookMessage.from}")
+      logger.info(
+              "🚀 Processing ${webhookMessage.type} webhook message for user: ${webhookMessage.from}"
+      )
       val result = processWebhookMessage.process(webhookMessage)
 
       if (result.success) {
-        logger.info("🎉 Webhook processed successfully for user: ${webhookMessage.from}")
-        HttpHelper.ok(mapOf("message" to "Processed successfully"))
+        logger.info(
+                "🎉 ${webhookMessage.type} webhook processed successfully for user: ${webhookMessage.from}"
+        )
+        HttpHelper.ok(mapOf("message" to "Processed successfully", "type" to webhookMessage.type))
       } else {
         logger.error(
-                "💥 Webhook processing failed for user: ${webhookMessage.from}, error: ${result.error}"
+                "💥 ${webhookMessage.type} webhook processing failed for user: ${webhookMessage.from}, error: ${result.error}"
         )
         HttpHelper.badRequest(result.error ?: "Processing failed")
       }
