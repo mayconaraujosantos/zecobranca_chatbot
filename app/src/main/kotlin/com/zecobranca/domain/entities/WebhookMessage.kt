@@ -5,14 +5,16 @@ import com.fasterxml.jackson.annotation.JsonProperty
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class WebhookMessage(
-        val id: String?,
-        val from: String?, // remetente do WhatsApp
-        val body: String?, // texto da mensagem
+        @JsonProperty("id") val id: String?,
+        @JsonProperty("from") val from: String?, // remetente do WhatsApp
+        @JsonProperty("body") val body: String?, // texto da mensagem
+        @JsonProperty("type")
         val type: String?, // tipo: "received", "receveid_message", "charge_status", etc.
-        val timestamp: Long?,
-        val instanceId: String?, // id da instância
-        val status: Int? = null, // status do ChatPro (ex: 400, 200)
-        val chargeStatus: String? = null, // status da cobrança
+        @JsonProperty("timestamp") val timestamp: Long?,
+        @JsonProperty("instanceId") val instanceId: String?, // id da instância
+        @JsonProperty("status") val status: Int? = null, // status do ChatPro (ex: 400, 200)
+        @JsonProperty("chargeStatus") val chargeStatus: String? = null, // status da cobrança
+        @JsonProperty("fromMe")
         val fromMe: Boolean? =
                 null, // indica se a mensagem foi enviada por nós (true) ou pelo usuário (false)
 
@@ -20,11 +22,11 @@ data class WebhookMessage(
         @JsonProperty("Body") val bodyInfo: BodyInfo? = null,
 
         // Mapeamento para formato oficial do ChatPro (array format)
-        val cmd: String? = null, // comando do webhook (ex: "ack")
-        val ack: Int? = null, // status do ACK (0-4)
-        val to: String? = null, // destinatário
-        val t: Long? = null, // timestamp em segundos
-        val isSync: Boolean? = null // se é sincronização de dispositivo
+        @JsonProperty("cmd") val cmd: String? = null, // comando do webhook (ex: "ack")
+        @JsonProperty("ack") val ack: Int? = null, // status do ACK (0-4)
+        @JsonProperty("to") val to: String? = null, // destinatário
+        @JsonProperty("t") val t: Long? = null, // timestamp em segundos
+        @JsonProperty("isSync") val isSync: Boolean? = null // se é sincronização de dispositivo
 ) {
   // Método para obter o ID correto (prioriza Body.Info.Id, depois id direto)
   fun getActualId(): String? = bodyInfo?.info?.id ?: id
