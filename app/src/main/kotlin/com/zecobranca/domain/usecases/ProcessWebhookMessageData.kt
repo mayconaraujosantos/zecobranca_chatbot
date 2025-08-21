@@ -29,6 +29,11 @@ class ProcessWebhookMessageData(
     val instanceId = webhookMessage.instanceId ?: ""
 
     logger.info("📱 Processing message from: $from, text: '$text', instance: $instanceId")
+    logger.debug(
+            "🔍 Text length: ${text.length}, Text bytes: ${text.toByteArray().joinToString(", ") { "0x${it.toString(16).uppercase()}" }}"
+    )
+    logger.debug("🔍 Text comparison - '1' == '$text': ${"1" == text}")
+    logger.debug("🔍 Text comparison - '1'.equals('$text'): ${"1".equals(text)}")
 
     // Carrega ou cria estado da conversa
     val state = conversationRepo.loadByUserId(from) ?: ConversationState(userId = from)
