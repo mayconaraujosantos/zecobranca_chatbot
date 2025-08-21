@@ -1,7 +1,6 @@
 package com.zecobranca.presentation.controllers
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.zecobranca.domain.entities.WebhookMessage
 import com.zecobranca.domain.usecases.ProcessWebhookMessageData
 import com.zecobranca.presentation.helpers.HttpHelper
@@ -16,15 +15,17 @@ class WebhookController(
         private val validation: Validation,
 ) : Controller {
 
-  private val mapper = jacksonObjectMapper()
+  private val mapper = ObjectMapper()
   private val logger = LoggerFactory.getLogger(WebhookController::class.java)
 
   override suspend fun handle(request: HttpRequest): HttpResponse {
     logger.info("🔄 Webhook request received - Body length: ${request.body.length}")
+    logger.debug("📄 Raw webhook body: ${request.body}")
 
     return try {
       logger.debug("📝 Parsing webhook message from JSON")
-      val webhookMessage = mapper.readValue<WebhookMessage>(request.body)
+      val webhookMessage = mapper.readValue(request.body, WebhookMessage::class.java)
+
       logger.info(
               "✅ Webhook parsed successfully - From: ${webhookMessage.from}, Body: ${webhookMessage.body}, Type: ${webhookMessage.type}"
       )
