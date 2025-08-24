@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  node-red:
+    image: nodered/node-red:3.1.0-18
+    container_name: node-red-prod
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./data:/data
+      - ./settings.js:/data/settings.js:ro  # Arquivo de configuração
+    environment:
+      - TZ=America/Sao_Paulo
+      - NODE_RED_ENABLE_PROJECTS=true
+      - NODE_RED_ENABLE_SAFE_MODE=false
+    restart: unless-stopped
+    networks:
+      - node-red-network
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    # Limites de recursos
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1880"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  node-red-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
