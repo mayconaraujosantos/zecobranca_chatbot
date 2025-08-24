@@ -21,7 +21,7 @@ COPY app/src/ app/src/
 RUN ./gradlew clean build --no-daemon
 
 # Etapa final - Runtime
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:24-jre-alpine
 
 # Instalar curl para healthcheck mais confiável
 RUN apk add --no-cache curl
