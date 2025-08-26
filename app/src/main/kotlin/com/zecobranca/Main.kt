@@ -15,7 +15,6 @@ suspend fun main() {
   val app = setupApp()
 
   logger.info("🌐 Starting Javalin server on host 0.0.0.0, port ${Env.port}")
-  // Configurar host 0.0.0.0 para aceitar conexões externas (necessário para Railway)
   app.start("0.0.0.0", Env.port)
 
   logger.info("✅ ZéCobrança Bot started successfully!")
