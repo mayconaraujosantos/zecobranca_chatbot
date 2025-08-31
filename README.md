@@ -109,4 +109,4 @@ Executar testes: make test
 Deploy Railway: railway up
 Configurar webhook: URL do Railway na ChatPro
 
-Esta estrutura é production-ready e segue as melhores práticas da indústria, mantendo-se fiel aos princípios da Clean Architecture que você solicitou! 🎉
+Esta estrutura é production-ready e segue as melhores práticas da indústria, mantendo-se fiel aos princípios da Clean Architecture
