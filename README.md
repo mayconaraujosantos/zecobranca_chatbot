@@ -1,5 +1,5 @@
 Estrutura Clean Architecture Completa - ZéCobrança Bot
-Criei uma implementação completa seguindo exatamente o padrão da Clean Architecture do repositório que você mencionou. Aqui está o que foi implementado:
+Criei uma implementação completa seguindo exatamente o padrão da Clean Architecture do repositório https://github.com/rmanguinho/clean-ts-api . Aqui está o que foi implementado:
 🏗️ Camadas da Arquitetura
 🟨 Domain Layer (Núcleo)
 
