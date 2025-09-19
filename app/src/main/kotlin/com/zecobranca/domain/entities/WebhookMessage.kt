@@ -18,76 +18,172 @@ data class WebhookMessage(
   // Mapeamento para estrutura aninhada do ChatPro (formato atual)
   @JsonProperty("Body") val bodyInfo: BodyInfo? = null,
 
-  // Mapeamento para formato oficial do ChatPro (array format)
+  // *** NOVOS CAMPOS PARA FORMATO DE ARRAY DO CHATPRO ***
   @JsonProperty("cmd") val cmd: String? = null, // comando do webhook (ex: "ack")
   @JsonProperty("ack") val ack: Int? = null, // status do ACK (0-4)
   @JsonProperty("to") val to: String? = null, // destinatário
   @JsonProperty("t") val t: Long? = null, // timestamp em segundos
   @JsonProperty("isSync") val isSync: Boolean? = null, // se é sincronização de dispositivo
 
-  // *** NOVOS CAMPOS PARA FORMATO SIMPLES ***
+  // *** CAMPOS PARA FORMATO SIMPLES ***
   @JsonProperty("number") val number: String? = null, // número do formato simples
   @JsonProperty("message") val message: String? = null, // mensagem do formato simples
-  @JsonProperty("quoted_message_id") val quotedMessageId: String? = null // ID da mensagem citada
-) {
-  // Método para obter o ID correto
-  fun getActualId(): String? = bodyInfo?.info?.id ?: id ?: quotedMessageId
+  @JsonProperty("quoted_message_id") val quotedMessageId: String? = null, // ID da mensagem citada
 
-  // Método para obter o remetente correto (ATUALIZADO para incluir number)
+  // *** NOVOS CAMPOS PARA DETECÇÃO DE LOOPS ***
+  @JsonProperty("messageId") val messageId: String? = null, // ID alternativo da mensagem
+  @JsonProperty("pushName") val pushName: String? = null, // nome do contato
+  @JsonProperty("participant") val participant: String? = null // participante em grupo
+) {
+
+  // *** MELHORADO: Método para obter o ID correto ***
+  fun getActualId(): String? =
+    bodyInfo?.info?.id ?:
+    id ?:
+    messageId ?:
+    quotedMessageId ?:
+    System.currentTimeMillis().toString()
+
+  // *** MELHORADO: Método para obter o remetente correto ***
   fun getActualFrom(): String? {
     val remoteJid = bodyInfo?.info?.remoteJid
     val senderJid = bodyInfo?.info?.senderJid
-    return remoteJid?.replace("@s.whatsapp.net", "")?.replace("@g.us", "")
-      ?: senderJid?.replace("@s.whatsapp.net", "")?.replace("@g.us", "")
-      ?: from?.replace("@s.whatsapp.net", "")?.replace("@g.us", "")
-      ?: number // *** NOVO: usar number do formato simples ***
+    val participantJid = participant
+
+    // Limpar JID do WhatsApp
+    fun cleanJid(jid: String?): String? =
+      jid?.replace("@s.whatsapp.net", "")
+        ?.replace("@g.us", "")
+        ?.replace("@c.us", "")
+
+    return cleanJid(remoteJid) ?:
+    cleanJid(senderJid) ?:
+    cleanJid(participantJid) ?:
+    cleanJid(from) ?:
+    number
   }
 
-  // Método para obter o texto correto (ATUALIZADO para incluir message)
-  fun getActualBody(): String? = bodyInfo?.text ?: body ?: message // *** NOVO: usar message do formato simples ***
+  // *** MELHORADO: Método para obter o texto correto ***
+  fun getActualBody(): String? =
+    bodyInfo?.text ?:
+    body ?:
+    message
 
-  // Método para obter o timestamp correto
-  fun getActualTimestamp(): Long? = bodyInfo?.info?.timestamp ?: timestamp ?: t?.let { it * 1000 }
+  // *** MELHORADO: Método para obter o timestamp correto ***
+  fun getActualTimestamp(): Long? =
+    bodyInfo?.info?.timestamp ?:
+    timestamp ?:
+    t?.let { it * 1000 } // Converter de segundos para milissegundos
 
-  // Método para obter o fromMe correto
-  fun getActualFromMe(): Boolean? = bodyInfo?.info?.fromMe ?: fromMe
+  // *** MELHORADO: Método para obter o fromMe correto ***
+  fun getActualFromMe(): Boolean? =
+    bodyInfo?.info?.fromMe ?:
+    fromMe
 
-  // Método para obter o status correto
-  fun getActualStatus(): Int? = bodyInfo?.info?.status ?: status ?: ack
+  // *** MELHORADO: Método para obter o status correto ***
+  fun getActualStatus(): Int? =
+    bodyInfo?.info?.status ?:
+    status ?:
+    ack
 
-  // Método para determinar o tipo do webhook (ATUALIZADO)
+  // *** MELHORADO: Método para determinar o tipo do webhook ***
   fun getActualType(): String {
     return when {
-      cmd == "ack" -> "ack_update"
+      // Eventos de ACK têm prioridade
+      cmd == "ack" || ack != null -> "ack_update"
+
+      // Corrigir erro de digitação comum do ChatPro
       type == "receveid_message" -> "received"
-      type != null -> type!!
-      // *** NOVO: detectar formato simples ***
+
+      // Usar tipo definido se válido
+      type != null && type.isNotBlank() -> type.lowercase()
+
+      // Detectar formato simples (number + message)
       number != null && message != null -> "received"
+
+      // Detectar mensagens do próprio bot
+      getActualFromMe() == true -> "sent"
+
+      // Padrão
       else -> "unknown"
     }
   }
 
-  // Método para verificar se é um evento de ACK
-  fun isAckEvent(): Boolean = cmd == "ack" || ack != null
+  // *** MELHORADO: Método para verificar se é um evento de ACK ***
+  fun isAckEvent(): Boolean =
+    cmd == "ack" ||
+      ack != null ||
+      getActualType() == "ack_update"
 
-  // Método para obter a descrição do status ACK
+  // *** NOVO: Método para verificar se é mensagem do próprio bot ***
+  fun isBotMessage(): Boolean {
+    val messageText = getActualBody()
+    return getActualFromMe() == true ||
+      messageText?.contains("ZéCobrança 🤖") == true ||
+      messageText?.contains("1️⃣") == true ||
+      messageText?.contains("2️⃣") == true ||
+      messageText?.contains("Consultar Débito") == true ||
+      messageText?.contains("Pagamento") == true
+  }
+
+  // *** NOVO: Método para verificar se é mensagem de grupo ***
+  fun isGroupMessage(): Boolean =
+    getActualFrom()?.contains("@g.us") == true ||
+      bodyInfo?.info?.remoteJid?.contains("@g.us") == true
+
+  // *** MELHORADO: Método para obter a descrição do status ACK ***
   fun getAckDescription(): String? {
     return when (getActualStatus()) {
       0 -> "Clock - Mensagem ainda não foi enviada"
-      1 -> "Sent - Mensagem enviada"
-      2 -> "Received - Mensagem recebida"
-      3 -> "Read - Mensagem lida"
-      4 -> "Played - Áudio foi reproduzido"
+      1 -> "Sent - Mensagem enviada para o servidor"
+      2 -> "Delivered - Mensagem entregue ao dispositivo"
+      3 -> "Read - Mensagem lida pelo destinatário"
+      4 -> "Played - Mensagem de áudio/vídeo reproduzida"
       else -> null
     }
   }
+
+  // *** NOVO: Método para verificar se deve ser processado ***
+  fun shouldBeProcessed(): Boolean {
+    return when {
+      // Não processar ACKs
+      isAckEvent() -> false
+
+      // Não processar mensagens do próprio bot
+      isBotMessage() -> false
+
+      // Não processar mensagens sem remetente
+      getActualFrom().isNullOrBlank() -> false
+
+      // Não processar mensagens vazias
+      getActualBody().isNullOrBlank() -> false
+
+      // Processar apenas mensagens recebidas
+      getActualType() == "received" -> true
+
+      // Não processar outros tipos por padrão
+      else -> false
+    }
+  }
+
+  // *** NOVO: Método para obter nome do contato ***
+  fun getContactName(): String? =
+    bodyInfo?.info?.pushName ?:
+    pushName
+
+  // *** NOVO: Método para debug/log ***
+  fun toLogString(): String =
+    "WebhookMessage(from=${getActualFrom()}, type=${getActualType()}, body='${getActualBody()?.take(50)}...', timestamp=${getActualTimestamp()})"
 }
 
-// Estrutura aninhada do ChatPro (formato atual)
+// *** ESTRUTURA ANINHADA DO CHATPRO (FORMATO ATUAL) ***
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class BodyInfo(
   @JsonProperty("Info") val info: MessageInfo? = null,
-  @JsonProperty("Text") val text: String? = null  // Adicionado @JsonProperty("Text")
+  @JsonProperty("Text") val text: String? = null,
+  @JsonProperty("ExtendedText") val extendedText: String? = null, // Texto estendido
+  @JsonProperty("MediaType") val mediaType: String? = null, // Tipo de mídia
+  @JsonProperty("Caption") val caption: String? = null // Legenda de mídia
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -98,5 +194,6 @@ data class MessageInfo(
   @JsonProperty("FromMe") val fromMe: Boolean? = null,
   @JsonProperty("Timestamp") val timestamp: Long? = null,
   @JsonProperty("PushName") val pushName: String? = null,
-  @JsonProperty("Status") val status: Int? = null
+  @JsonProperty("Status") val status: Int? = null,
+  @JsonProperty("Participant") val participant: String? = null // Para mensagens de grupo
 )
