@@ -96,7 +96,10 @@ data class WebhookMessage(
       type == "receveid_message" -> "received"
 
       // Usar tipo definido se válido
-      type != null && type.isNotBlank() -> type.lowercase()
+      type != null && type.isNotBlank() && type != "unknown" -> type.lowercase()
+
+      // *** NOVO: Se tem remetente e corpo, assumir como mensagem recebida ***
+      getActualFrom() != null && getActualBody() != null && !getActualBody().isNullOrBlank() -> "received"
 
       // Detectar formato simples (number + message)
       number != null && message != null -> "received"

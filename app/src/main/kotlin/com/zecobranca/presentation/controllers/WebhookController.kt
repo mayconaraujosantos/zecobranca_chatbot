@@ -293,9 +293,14 @@ class WebhookController(
         return HttpHelper.ok(mapOf("message" to "Webhook received", "type" to webhookMessage.getActualType()))
       }
 
-      // *** MELHORADO: Processar apenas mensagens relevantes ***
+      // *** MELHORADO: Processar mensagens relevantes ***
       val actualType = webhookMessage.getActualType()
-      if (actualType != "received" && actualType != "send_message") {
+
+      // Se tem remetente e corpo de mensagem, mas tipo é unknown, tratar como received
+      if (actualType == "unknown" && webhookMessage.getActualFrom() != null && webhookMessage.getActualBody() != null) {
+        logger.info("🔄 Converting unknown type to received for user message from: ${webhookMessage.getActualFrom()}")
+        // Continuar processamento como mensagem recebida
+      } else if (actualType != "received" && actualType != "send_message") {
         logger.info("ℹ️ Received system webhook - Type: $actualType")
         return HttpHelper.ok(mapOf("message" to "System webhook received", "type" to actualType))
       }
@@ -342,7 +347,7 @@ class WebhookController(
         id = webhookMessage.getActualId(),
         from = webhookMessage.getActualFrom(),
         body = webhookMessage.getActualBody(),
-        type = webhookMessage.getActualType(),
+        type = if (webhookMessage.getActualType() == "unknown" && webhookMessage.getActualFrom() != null && webhookMessage.getActualBody() != null) "received" else webhookMessage.getActualType(),
         timestamp = webhookMessage.getActualTimestamp(),
         instanceId = webhookMessage.instanceId,
         status = webhookMessage.getActualStatus(),
