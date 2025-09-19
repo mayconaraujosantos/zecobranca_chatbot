@@ -27,23 +27,67 @@ class WebhookController(
 
   private fun identifyJsonFormat(jsonBody: String): String {
     return when {
+      jsonBody.trim().startsWith("[") -> "array"
       jsonBody.contains("\"number\"") && jsonBody.contains("\"message\"") -> "simple"
       jsonBody.contains("\"Type\"") && jsonBody.contains("\"Body\"") -> "chatpro"
       else -> "unknown"
     }
   }
 
+  private fun parseArrayFormat(jsonBody: String): WebhookMessage? {
+    try {
+      val jsonArray = mapper.readTree(jsonBody)
+      if (jsonArray.isArray && jsonArray.size() > 1) {
+        val webhookData = jsonArray[1]
+
+        // Se é um ACK
+        if (webhookData.has("cmd") && webhookData.get("cmd").asText() == "ack") {
+          logger.debug("Parsing ACK from array format")
+          return WebhookMessage(
+            id = webhookData.get("id")?.asText(),
+            cmd = "ack",
+            ack = webhookData.get("ack")?.asInt(),
+            type = "ack_update",
+            t = webhookData.get("t")?.asLong(),
+            isSync = webhookData.get("isSync")?.asBoolean(),
+            from = null,
+            body = null,
+            timestamp = null,
+            instanceId = null,
+            status = null,
+            chargeStatus = null,
+            fromMe = null
+          )
+        }
+
+        // Outros tipos de mensagem em array format
+        return mapper.treeToValue(webhookData, WebhookMessage::class.java)
+      }
+    } catch (e: Exception) {
+      logger.warn("Failed to parse array format: ${e.message}")
+    }
+    return null
+  }
+
   private fun createBasicWebhookMessage(jsonBody: String): WebhookMessage {
-    logger.debug("🔧 Creating basic webhook message from JSON structure")
+    logger.debug("Creating basic webhook message from JSON structure")
 
     try {
-      // Primeiro, tentar detectar o formato do JSON
-      val isSimpleFormat = jsonBody.contains("\"number\"") && jsonBody.contains("\"message\"")
+      val format = identifyJsonFormat(jsonBody)
+      logger.debug("Identified JSON format: $format")
 
-      if (isSimpleFormat) {
-        logger.debug("📱 Detected simple format JSON (number/message structure)")
+      // Tratar formato de array primeiro
+      if (format == "array") {
+        val arrayResult = parseArrayFormat(jsonBody)
+        if (arrayResult != null) {
+          return arrayResult
+        }
+      }
 
-        // Parse do formato simples: {"number": "xxx", "message": "yyy", "quoted_message_id": "zzz"}
+      // Formato simples: {"number": "xxx", "message": "yyy", "quoted_message_id": "zzz"}
+      if (format == "simple") {
+        logger.debug("Detected simple format JSON (number/message structure)")
+
         val numberMatch = """"number":\s*"([^"]*)"""".toRegex().find(jsonBody)
         val messageMatch = """"message":\s*"([^"]*)"""".toRegex().find(jsonBody)
         val quotedMessageIdMatch = """"quoted_message_id":\s*"([^"]*)"""".toRegex().find(jsonBody)
@@ -52,23 +96,26 @@ class WebhookController(
         val body = messageMatch?.groupValues?.get(1)
         val quotedMessageId = quotedMessageIdMatch?.groupValues?.get(1)
 
-        logger.debug("🔍 Simple format - From: $from, Body: $body, QuotedId: $quotedMessageId")
+        logger.debug("Simple format - From: $from, Body: $body, QuotedId: $quotedMessageId")
 
         return WebhookMessage(
           id = quotedMessageId ?: System.currentTimeMillis().toString(),
           from = from,
           body = body,
-          type = "received", // Assumir que é mensagem recebida para formato simples
+          type = "received",
           timestamp = System.currentTimeMillis(),
           instanceId = null,
           status = null,
           chargeStatus = null,
-          fromMe = false
+          fromMe = false,
+          number = from,
+          message = body,
+          quotedMessageId = quotedMessageId
         )
       }
 
       // Parse do formato complexo (ChatPro) - mantém a lógica existente
-      logger.debug("🔧 Detected complex format JSON (ChatPro structure)")
+      logger.debug("Detected complex format JSON (ChatPro structure)")
 
       // Extrair campos básicos usando regex para a estrutura real do ChatPro
       val typeMatch = """"Type":\s*"([^"]*)"""".toRegex().find(jsonBody)
@@ -114,7 +161,7 @@ class WebhookController(
       val statusText = statusTextMatch?.groupValues?.get(1)
       val chargeStatus = chargeStatusMatch?.groupValues?.get(1)
 
-      logger.debug("🔍 Complex format - Type: $type, From: $from, Body: $body, Timestamp: $timestamp, InstanceId: $instanceId, Status: $status")
+      logger.debug("Complex format - Type: $type, From: $from, Body: $body, Timestamp: $timestamp, InstanceId: $instanceId, Status: $status")
 
       return WebhookMessage(
         id = id,
@@ -129,7 +176,7 @@ class WebhookController(
       )
 
     } catch (e: Exception) {
-      logger.error("💥 Failed to create basic webhook message: ${e.message}")
+      logger.error("Failed to create basic webhook message: ${e.message}")
       // Retornar objeto vazio em caso de falha
       return WebhookMessage(
         id = null,
@@ -146,18 +193,24 @@ class WebhookController(
 
   override suspend fun handle(request: HttpRequest): HttpResponse {
     logger.info("🔄 Webhook request received - Body length: ${request.body.length}")
-    logger.debug("📄 Raw webhook body: ${request.body}")
+    logger.debug("Raw webhook body: ${request.body}")
 
     return try {
-      logger.debug("📝 Parsing webhook message from JSON")
-      logger.debug("📄 Full JSON body: ${request.body}")
+      logger.debug("Parsing webhook message from JSON")
+      logger.debug("Full JSON body: ${request.body}")
 
-      // Primeiro vamos tentar fazer o parse com a estrutura atual
+      // *** NOVO: Primeiro verificar se é formato de array ***
       val webhookMessage = try {
-        mapper.readValue(request.body, WebhookMessage::class.java)
+        if (request.body.trim().startsWith("[")) {
+          logger.debug("Detected array format webhook from ChatPro")
+          val arrayResult = parseArrayFormat(request.body)
+          arrayResult ?: throw IllegalArgumentException("Failed to parse array format")
+        } else {
+          // Parse normal para outros formatos
+          mapper.readValue(request.body, WebhookMessage::class.java)
+        }
       } catch (e: Exception) {
         logger.warn("⚠️ Standard parsing failed, creating basic webhook message: ${e.message}")
-        // Criar um webhook básico com informações extraídas manualmente
         createBasicWebhookMessage(request.body)
       }
 
@@ -165,7 +218,7 @@ class WebhookController(
         "✅ Webhook parsed successfully - From: ${webhookMessage.getActualFrom()}, Body: ${webhookMessage.getActualBody()}, Type: ${webhookMessage.getActualType()}"
       )
 
-      // Verificar se é um evento de ACK (acknowledgment) - não precisa de processamento para conversa
+      // *** MELHORADO: Verificar se é um evento de ACK ***
       if (webhookMessage.isAckEvent()) {
         logger.info(
           "📨 Received ACK webhook - Status: ${webhookMessage.getActualStatus()} (${webhookMessage.getAckDescription()})"
@@ -179,11 +232,9 @@ class WebhookController(
         )
       }
 
-      // Verificar se é um webhook de status de cobrança (não precisa de processamento)
+      // Verificar se é um webhook de status de cobrança
       if (webhookMessage.getActualType() == "charge_status") {
-        logger.info(
-          "💰 Received charge status webhook - Status: ${webhookMessage.getActualStatus()}"
-        )
+        logger.info("💰 Received charge status webhook - Status: ${webhookMessage.getActualStatus()}")
         return HttpHelper.ok(
           mapOf(
             "message" to "Charge status received",
@@ -192,11 +243,9 @@ class WebhookController(
         )
       }
 
-      // Verificar se é um webhook de status de mensagem (não precisa de processamento)
+      // Verificar se é um webhook de status de mensagem
       if (webhookMessage.getActualType() == "message_status") {
-        logger.info(
-          "📨 Received message status webhook - Status: ${webhookMessage.getActualStatus()}"
-        )
+        logger.info("📋 Received message status webhook - Status: ${webhookMessage.getActualStatus()}")
         return HttpHelper.ok(
           mapOf(
             "message" to "Message status received",
@@ -205,11 +254,9 @@ class WebhookController(
         )
       }
 
-      // Verificar se é um webhook de status de conexão (não precisa de processamento)
+      // Verificar se é um webhook de status de conexão
       if (webhookMessage.getActualType() == "connection_status") {
-        logger.info(
-          "🔌 Received connection status webhook - Status: ${webhookMessage.getActualStatus()}"
-        )
+        logger.info("🔌 Received connection status webhook - Status: ${webhookMessage.getActualStatus()}")
         return HttpHelper.ok(
           mapOf(
             "message" to "Connection status received",
@@ -218,7 +265,7 @@ class WebhookController(
         )
       }
 
-      // Verificar se é um webhook de grupo (não precisa de processamento por enquanto)
+      // Verificar se é um webhook de grupo
       if (webhookMessage.getActualType() == "group_message") {
         logger.info("👥 Received group message webhook - From: ${webhookMessage.getActualFrom()}")
         return HttpHelper.ok(
@@ -229,47 +276,56 @@ class WebhookController(
         )
       }
 
-      // Verificar se é um webhook de mensagem válida (recebida ou enviada pelo usuário)
-      // Ignorar webhooks de confirmação de envio para evitar loops
+      // *** NOVO: Verificar se é mensagem do próprio bot para evitar loop ***
+      val messageBody = webhookMessage.getActualBody()
+      if (messageBody != null && (messageBody.contains("ZéCobrança 🤖") ||
+          messageBody.contains("1️⃣") ||
+          messageBody.contains("2️⃣") ||
+          messageBody.contains("Consultar Débito") ||
+          messageBody.contains("Pagamento"))) {
+        logger.info("🤖 Ignoring bot's own message to prevent loop")
+        return HttpHelper.ok(mapOf("message" to "Bot message ignored to prevent loop"))
+      }
+
+      // Verificar se é um webhook sem remetente
       if (webhookMessage.getActualFrom() == null) {
         logger.info("ℹ️ Received webhook without sender - Type: ${webhookMessage.getActualType()}")
         return HttpHelper.ok(mapOf("message" to "Webhook received", "type" to webhookMessage.getActualType()))
       }
 
-      // Processar mensagens recebidas (incluindo "receveid_message" com erro de digitação)
-      // e mensagens enviadas, mas não confirmações do sistema
+      // *** MELHORADO: Processar apenas mensagens relevantes ***
       val actualType = webhookMessage.getActualType()
       if (actualType != "received" && actualType != "send_message") {
         logger.info("ℹ️ Received system webhook - Type: $actualType")
         return HttpHelper.ok(mapOf("message" to "System webhook received", "type" to actualType))
       }
 
-      // Verificar se é uma confirmação de envio (FromMe: true) - ignorar para evitar loop
-      if (webhookMessage.getActualType() == "send_message" && webhookMessage.getActualFromMe() == true) {
-        logger.info("ℹ️ Ignoring message confirmation webhook to prevent loop - FromMe: true")
+      // *** NOVO: Verificar se é confirmação de envio para evitar loop ***
+      if (webhookMessage.getActualFromMe() == true) {
+        logger.info("🔄 Ignoring message confirmation webhook to prevent loop - FromMe: true")
         return HttpHelper.ok(
           mapOf("message" to "Message confirmation ignored", "type" to webhookMessage.getActualType())
         )
       }
 
-      // Verificar se é uma mensagem de grupo - processar como mensagem normal
+      // Verificar se é mensagem de grupo
       val isGroupMessage = webhookMessage.getActualFrom()?.contains("@g.us") == true
       if (isGroupMessage) {
         logger.info("👥 Processing group message from: ${webhookMessage.getActualFrom()}")
       }
 
-      // Convert to map for validation - CORRIGIDO para usar getActualType()
+      // Validação
       val messageMap = mapOf(
         "id" to webhookMessage.getActualId(),
         "from" to webhookMessage.getActualFrom(),
         "body" to webhookMessage.getActualBody(),
-        "type" to webhookMessage.getActualType(), // ← CORRIGIDO: usar getActualType()
+        "type" to webhookMessage.getActualType(),
         "timestamp" to webhookMessage.getActualTimestamp(),
         "instanceId" to webhookMessage.instanceId,
       )
       logger.debug("🔍 Validation map created: $messageMap")
 
-      logger.debug("✅ Running validation")
+      logger.debug("Running validation")
       val validationResult = validation.validate(messageMap)
       if (!validationResult.isValid) {
         logger.warn("❌ Validation failed: ${validationResult.errors}")
@@ -278,15 +334,15 @@ class WebhookController(
       logger.info("✅ Validation passed")
 
       logger.info(
-        "🚀 Processing ${webhookMessage.getActualType()} webhook message for user: ${webhookMessage.getActualFrom()}"
+        "🔄 Processing ${webhookMessage.getActualType()} webhook message for user: ${webhookMessage.getActualFrom()}"
       )
 
-      // Criar um WebhookMessage limpo para o processamento
+      // Criar WebhookMessage limpo para processamento
       val cleanWebhookMessage = WebhookMessage(
         id = webhookMessage.getActualId(),
         from = webhookMessage.getActualFrom(),
         body = webhookMessage.getActualBody(),
-        type = webhookMessage.getActualType(), // ← IMPORTANTE: usar getActualType()
+        type = webhookMessage.getActualType(),
         timestamp = webhookMessage.getActualTimestamp(),
         instanceId = webhookMessage.instanceId,
         status = webhookMessage.getActualStatus(),
@@ -298,18 +354,18 @@ class WebhookController(
 
       if (result.success) {
         logger.info(
-          "🎉 ${webhookMessage.getActualType()} webhook processed successfully for user: ${webhookMessage.getActualFrom()}"
+          "✅ ${webhookMessage.getActualType()} webhook processed successfully for user: ${webhookMessage.getActualFrom()}"
         )
         HttpHelper.ok(mapOf("message" to "Processed successfully", "type" to webhookMessage.getActualType()))
       } else {
         logger.error(
-          "💥 ${webhookMessage.getActualType()} webhook processing failed for user: ${webhookMessage.getActualFrom()}, error: ${result.error}"
+          "❌ ${webhookMessage.getActualType()} webhook processing failed for user: ${webhookMessage.getActualFrom()}, error: ${result.error}"
         )
         HttpHelper.badRequest(result.error ?: "Processing failed")
       }
     } catch (e: Exception) {
       logger.error("💥 Critical error processing webhook: ${e.message}", e)
-      logger.error("📋 Request body that caused error: ${request.body}")
+      logger.error("Request body that caused error: ${request.body}")
       HttpHelper.serverError("Failed to process webhook: ${e.message}")
     }
   }
